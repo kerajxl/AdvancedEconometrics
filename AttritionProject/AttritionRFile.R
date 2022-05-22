@@ -19,9 +19,11 @@ if (!require(logistf)) install.packages('logistf')
 if (!require(devtools)) install.packages('devtools')
 if (!require(mfx)) install.packages('mfx')
 if (!require(tidyverse)) install.packages('tidyverse')
-
+if (!require(regclass)) install.packages('regclass')
+if (!require(corrplot)) install.packages('corrplot')
 
 # Loading necessary libraries
+library("regclass")
 library("sandwich")
 library("lmtest")
 library("MASS")
@@ -32,6 +34,8 @@ library("aod")
 library("logistf") #Firth's bias reduction method
 library("stargazer")
 library("BaylorEdPsych")
+library("corrplot")
+
 
 # Loading external functions
 source("marginaleffects.R")
@@ -66,11 +70,19 @@ attrition %>%
   colSums() %>% 
   sort()
 
+
+
+
+
 attrition <- attrition %>% 
   select(-EmployeeCount, -Over18, -StandardHours, -EmployeeNumber, -DailyRate, -Department, -BusinessTravel,
          -DistanceFromHome, -EducationField, -HourlyRate, -JobLevel, -JobRole, -EnvironmentSatisfaction, 
          -MaritalStatus, -MonthlyRate, -PercentSalaryHike, -PerformanceRating, -RelationshipSatisfaction,
-         -StockOptionLevel, -YearsInCurrentRole, -YearsWithCurrManager, -Gender, -MonthlyIncome) # Same value for each row or some unnecesarry columns
+         -StockOptionLevel, -YearsInCurrentRole, -YearsWithCurrManager, -Gender, -MonthlyIncome,
+         -JobInvolvement, -NumCompaniesWorked, -TrainingTimesLastYear, -TotalWorkingYears) # Same value for each row or some unnecesarry columns
+
+correl <- cor(attrition, method = "kendall")
+corrplot(correl)
 
 sapply(attrition, 
        function(x) 
@@ -96,32 +108,35 @@ probitModel1 <- glm(Attrition ~ ., data=attrition,
                     family=binomial(link="probit"))
 summary(probitModel1)
 # YearsAtCompany is not significant pvalue = 0.752172
-attrition1 <- attrition %>% select(-YearsAtCompany)
+attrition1 <- attrition %>% select(-Education)
 
 probitModel2 <- glm(Attrition ~ ., data=attrition1, 
                     family=binomial(link="probit"))
 summary(probitModel2)
-lrtest(probitModel1, probitModel2) # pvalue 0.7425 not rejecting H0: beta_YearsAtCompany = 0
+lmtest::lrtest(probitModel1, probitModel2) # pvalue 0.7425 not rejecting H0: beta_YearsAtCompany = 0
 
 # Education is not significant pvalue = 0.460503
-attrition2 <- attrition1 %>% select(-Education)
+attrition2 <- attrition1
 probitModel3 <- glm(Attrition ~ ., data=attrition2, 
                     family=binomial(link="probit"))
 summary(probitModel3)
 
-lrtest(probitModel2, probitModel3) # pvalue 0.4616 not rejecting H0: beta_Education = 0
+lmtest::lrtest(probitModel2, probitModel3) # pvalue 0.4616 not rejecting H0: beta_Education = 0
 
-attrition3 <- attrition2 %>% select(-TotalWorkingYears)
+###########
+attrition3 <- attrition2 %>% select(-YearsAtCompany)
 probitModel4 <- glm(Attrition ~ ., data=attrition3, 
                     family=binomial(link="probit"))
 summary(probitModel4)
 
-lrtest(probitModel3, probitModel4)  # pvalue 0.06984 not rejecting H0: beta_TotalWorkingYears = 0
+############
+lmtest::lrtest(probitModel3, probitModel4)  # pvalue 0.06984 not rejecting H0: beta_TotalWorkingYears = 0
 
-attrition4 <- attrition3 %>% select(-TrainingTimesLastYear)
+attrition4 <- attrition3 %>% select(Attrition, Age,  Age2, JobSatisfaction, WorkLifeBalance, Over7KM, YearsSinceLastPromotion, Married, lnMonthlyIncome)
 probitModel5 <- glm(Attrition ~ ., data=attrition4, 
                     family=binomial(link="probit"))
 summary(probitModel5)
+linktest_result = linktest(probitModel5)
 lrtest(probitModel4, probitModel5) # pvalue 0.04832 rejecting H0: beta_TrainingTimesLastYear = 0
 
 # Marginal effects
@@ -135,12 +150,28 @@ marginaleffects(probitModel5, user.def.obs)
 PseudoR2(probitModel5)
 
 # Linktest
-linktest_result = linktest(probitModel5)
+
 summary(linktest_result)
 
-probitModel5 <- glm(Attrition ~ Age + JobInvolvement + JobSatisfaction + NumCompaniesWorked + OverTime + WorkLifeBalance
-                    + YearsSinceLastPromotion + Over7KM + Age2 + Married + Divorced + Female + lnMonthlyIncome + AgeOverTime, data=attrition4, 
+probitModel5 <- glm(Attrition ~ Age +  JobSatisfaction  + WorkLifeBalance
+                    + YearsSinceLastPromotion + Over7KM + Age2 + Married +lnMonthlyIncome , data=attrition4, 
                     family=binomial(link="probit"))
 summary(probitModel5)
 gofresults = gof(probitModel5)
 gofresults$gof
+
+
+logitModel <- glm(Attrition ~ Age +  JobSatisfaction  + WorkLifeBalance
+                    + YearsSinceLastPromotion + Over7KM + Age2 + Married +lnMonthlyIncome + Over7KM + 
+                    NumCompaniesWorked + JobInvolvement, data=attrition, 
+                    family=binomial(link="logit"))
+summary(logitModel)
+linktest_result = linktest(logitModel)
+gofresults = gof(logitModel)
+gofresults$gof
+
+BaylorEdPsych::PseudoR2(probitModel5)
+BaylorEdPsych::PseudoR2(logitModel)
+
+hist(attrition$MonthlyIncome)
+
