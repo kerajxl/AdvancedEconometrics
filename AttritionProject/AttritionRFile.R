@@ -58,6 +58,7 @@ attrition$OverTime <- ifelse(attrition$OverTime == 'Yes', 1, 0)
 # attrition$Travel_Frequently <- ifelse(attrition$BusinessTravel == 'Travel_Frequently', 1, 0)
 attrition$lnMonthlyIncome <- log(attrition$MonthlyIncome)
 attrition$AgeOverTime <- attrition$Age * attrition$OverTime
+attrition$AgexMarried <- attrition$Age * attrition$Married
 
 attrition %>% 
   head()
@@ -226,82 +227,118 @@ summary(attrition)
 
 
 # Estimation of OLS model
-OLSmodel <- lm(Attrition ~ ., data = attrition)
+OLSmodel <- lm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried + Education + JobInvolvement +
+                 JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked +
+                 TotalWorkingYears + WorkLifeBalance + YearsAtCompany + YearsSinceLastPromotion +
+                 Over7KM + Married + Female, data = attrition)
 summary(OLSmodel)
 
 # White's estimator of the variance-covariane matrix
 robust_vcov = vcovHC(OLSmodel, data = attrition, type = "HC")
-coeftest(OLSmodel, vcov.=robust_vcov)
+OLSWhite <- coeftest(OLSmodel, vcov.=robust_vcov)
 
 # Estimation of probit model
-probitModel1 <- glm(Attrition ~ ., data=attrition, 
+probitModel1 <- glm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried + Education + JobInvolvement +
+                      JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked  +
+                      TotalWorkingYears + WorkLifeBalance + YearsAtCompany + YearsSinceLastPromotion +
+                      Over7KM + Married + Female, data=attrition, 
                     family=binomial(link="probit"))
 summary(probitModel1)
-# YearsAtCompany is not significant pvalue = 0.752172
-attrition1 <- attrition %>% select(-Education)
 
-probitModel2 <- glm(Attrition ~ ., data=attrition1, 
-                    family=binomial(link="probit"))
-summary(probitModel2)
-lmtest::lrtest(probitModel1, probitModel2) # pvalue 0.7425 not rejecting H0: beta_YearsAtCompany = 0
+####
 
-# Education is not significant pvalue = 0.460503
-attrition2 <- attrition1
-probitModel3 <- glm(Attrition ~ ., data=attrition2, 
-                    family=binomial(link="probit"))
-summary(probitModel3)
+logitModel1 <- glm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried + Education + JobInvolvement +
+                      JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked  +
+                      TotalWorkingYears + WorkLifeBalance + YearsAtCompany + YearsSinceLastPromotion +
+                      Over7KM + Married + Female, data=attrition, 
+                    family=binomial(link="logit"))
+summary(logitModel1)
 
-lmtest::lrtest(probitModel2, probitModel3) # pvalue 0.4616 not rejecting H0: beta_Education = 0
+stargazer(OLSWhite, probitModel1, logitModel1, type = 'text',
+          align = TRUE, style = "default", df = FALSE,
+          star.cutoffs = c(0.05, 0.01, 0.001))
 
-###########
-attrition3 <- attrition2 %>% select(-YearsAtCompany)
-probitModel4 <- glm(Attrition ~ ., data=attrition3, 
-                    family=binomial(link="probit"))
-summary(probitModel4)
+####
+AIC(probitModel1); AIC(logitModel1) 
+BIC(probitModel1); BIC(logitModel1) #logit rulez
 
-############
-lmtest::lrtest(probitModel3, probitModel4)  # pvalue 0.06984 not rejecting H0: beta_TotalWorkingYears = 0
+### general-to-specific
 
-attrition4 <- attrition3 %>% select(Attrition, Age,  Age2, JobSatisfaction, WorkLifeBalance, Over7KM, YearsSinceLastPromotion, Married, lnMonthlyIncome)
-probitModel5 <- glm(Attrition ~ ., data=attrition4, 
-                    family=binomial(link="probit"))
-summary(probitModel5)
-linktest_result = linktest(probitModel5)
-lrtest(probitModel4, probitModel5) # pvalue 0.04832 rejecting H0: beta_TrainingTimesLastYear = 0
+# - Education
+logitModel2 <- glm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried  + JobInvolvement +
+                     JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked  +
+                     TotalWorkingYears + WorkLifeBalance + YearsAtCompany + YearsSinceLastPromotion +
+                     Over7KM + Married + Female, data=attrition, 
+                   family=binomial(link="logit"))
+
+summary(logitModel2)
+lmtest::lrtest(logitModel1, logitModel2) #0.43 p-value can not reject the null
+# - YearsAtCompany
+logitModel3 <- glm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried + JobInvolvement +
+                     JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked  +
+                     TotalWorkingYears + WorkLifeBalance  + YearsSinceLastPromotion +
+                     Over7KM + Married + Female, data=attrition, 
+                   family=binomial(link="logit"))
+
+summary(logitModel3)
+lmtest::lrtest(logitModel1, logitModel3) #0.47 p-value can not reject the null 
+
+# - AgexMarried
+logitModel4 <- glm(Attrition ~ Age + Age2 + AgeOverTime +  JobInvolvement +
+                     JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked  +
+                     TotalWorkingYears + WorkLifeBalance  + YearsSinceLastPromotion +
+                     Over7KM + Married + Female, data=attrition, 
+                   family=binomial(link="logit"))
+
+summary(logitModel4)
+lmtest::lrtest(logitModel1, logitModel4) #0.4094 p-value can not reject the null 
+
+# - Female
+logitModel5 <- glm(Attrition ~ Age + Age2 + AgeOverTime +  JobInvolvement + 
+                     JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked +
+                     TotalWorkingYears + WorkLifeBalance  + YearsSinceLastPromotion +
+                     Over7KM + Married , data=attrition, 
+                   family=binomial(link="logit"))
+
+summary(logitModel5)
+lmtest::lrtest(logitModel1, logitModel5) #0.21 p-value can not reject the null 
+
+
+
+#diagnostic
+
+linktest_result = linktest(logitModel5)
+gofresults = gof(logitModel5)
+gofresults$gof
+
+### - interacton
+logitModel6 <- glm(Attrition ~ Age + Age2 +   JobInvolvement + 
+                     JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked +
+                     TotalWorkingYears + WorkLifeBalance  + YearsSinceLastPromotion +
+                     Over7KM + Married , data=attrition, 
+                   family=binomial(link="logit"))
+
+summary(logitModel6)
+lmtest::lrtest(logitModel1, logitModel6) #0.21 p-value can not reject the null 
+
+#diagnostic
+
+linktest_result = linktest(logitModel6)
+gofresults = gof(logitModel6)
+gofresults$gof
+
+BaylorEdPsych::PseudoR2(logitModel6)
 
 # Marginal effects
-meff = probitmfx(formula=Attrition ~ ., data=attrition4, atmean=TRUE)
+options(scipen = 99)
+meff = probitmfx(formula=Attrition ~ Age + Age2 +   JobInvolvement + 
+                   JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked +
+                   TotalWorkingYears + WorkLifeBalance  + YearsSinceLastPromotion +
+                   Over7KM + Married , data=attrition, atmean=TRUE)
 meff
+mean(attrition$Age)
 
-user.def.obs = c(1,30,2,2,3,0,3,3,1,900,1,0,0,7.7,0) #convention: (intercept, x1, x2, ...)
-marginaleffects(probitModel5, user.def.obs)
-
-# R-squared statistics
-PseudoR2(probitModel5)
-
-# Linktest
-
-summary(linktest_result)
-
-probitModel5 <- glm(Attrition ~ Age +  JobSatisfaction  + WorkLifeBalance
-                    + YearsSinceLastPromotion + Over7KM + Age2 + Married +lnMonthlyIncome , data=attrition4, 
-                    family=binomial(link="probit"))
-summary(probitModel5)
-gofresults = gof(probitModel5)
-gofresults$gof
+(-0.0329+2*0.00039*36.9)*100
 
 
-logitModel <- glm(Attrition ~ Age +  JobSatisfaction  + WorkLifeBalance
-                    + YearsSinceLastPromotion + Over7KM + Age2 + Married +lnMonthlyIncome + Over7KM + 
-                    NumCompaniesWorked + JobInvolvement, data=attrition, 
-                    family=binomial(link="logit"))
-summary(logitModel)
-linktest_result = linktest(logitModel)
-gofresults = gof(logitModel)
-gofresults$gof
-
-BaylorEdPsych::PseudoR2(probitModel5)
-BaylorEdPsych::PseudoR2(logitModel)
-
-hist(attrition$MonthlyIncome)
 
