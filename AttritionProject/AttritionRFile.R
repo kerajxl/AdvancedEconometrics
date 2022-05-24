@@ -12,7 +12,7 @@
 Sys.setenv(LANG = "en")
 options(scipen = 5)
 
-# Installing necessary libraries
+# Installing necessary libraries ----
 if (!require(htmltools)) install.packages('htmltools')
 if (!require(LogisticDx)) install.packages('LogisticDx')
 if (!require(logistf)) install.packages('logistf')
@@ -22,7 +22,7 @@ if (!require(tidyverse)) install.packages('tidyverse')
 if (!require(regclass)) install.packages('regclass')
 if (!require(corrplot)) install.packages('corrplot')
 
-# Loading necessary libraries
+# Loading necessary libraries ----
 library("regclass")
 library("sandwich")
 library("lmtest")
@@ -38,15 +38,15 @@ library("corrplot")
 library(gridExtra)
 
 
-# Loading external functions
+# Loading external functions ----
 source("marginaleffects.R")
 source("linktest.R")
 
-# Loading the data about Employee Attrition & Performance
+# Loading the data about Employee Attrition & Performance ----
 attrition <- read_delim("HR_Employee_Attrition.csv")
 
+# Necessary data transformations ----
 attrition$Over7KM <- ifelse(attrition$DistanceFromHome > median(attrition$DistanceFromHome), 1, 0)
-
 # attrition$Single <- ifelse(attrition$MaritalStatus == 'Single', 1, 0)
 attrition$Age2 <- attrition$Age^2
 attrition$Married <- ifelse(attrition$MaritalStatus == 'Married', 1, 0)
@@ -70,14 +70,15 @@ attrition %>%
 #                                       "Travel_Frequently"),
 #                            ordered = TRUE) # ordinal
 
+# Check if in the dataset exist some missing values ----
+
 attrition %>% 
   is.na() %>% 
   colSums() %>% 
   sort()
 
 
-# Data analysis
-
+# Data analysis ----
 
 attrition %>% 
   group_by(Attrition) %>% 
@@ -106,32 +107,33 @@ attrition %>%
 options(repr.plot.width=8, repr.plot.height=6) 
 
 attrition %>%
-  select(Female, Age) %>%
+  select(Attrition, Age) %>%
   filter(!is.na(Age)) %>%
-  group_by(Female) %>% 
+  group_by(Attrition) %>% 
   summarise(mean = mean(Age))
 
 attrition$Female <- ifelse(attrition$Female == 1, 'Female', 'Male')
+attrition$Attrition <- ifelse(attrition$Attrition == 1, 'Yes', 'No')
 
-dat_text <- data.frame(label = c("Mean = 37.3", "Mean = 36.7"),
-                       Female   = c('Female', 'Male'))
+dat_text <- data.frame(label = c("Mean = 37.6", "Mean = 33.6"),
+                       Attrition  = c('No', 'Yes'))
 
 
 attrition %>%
-  select(Female, Age) %>%
+  select(Attrition, Age) %>%
   filter(!is.na(Age)) %>%
-  group_by(Female) %>%
+  group_by(Attrition) %>%
   ggplot(aes(x = Age)) +
-  geom_density(aes(fill = factor(Female)), alpha = 0.5, show.legend = FALSE) +
-  facet_wrap( ~ Female) +
+  geom_density(aes(fill = factor(Attrition)), alpha = 0.5, show.legend = FALSE) +
+  facet_wrap( ~ Attrition) +
   theme_minimal() +
   geom_vline(
-    aes(xintercept = mean(Age)),
+    aes(xintercept = ifelse(Attrition == 'Yes', 33.6, 37.6)),
     color = "red",
     linetype = "dashed",
     size = 1
   ) +
-  labs(title = "Age Distribution by Gender") +
+  labs(title = "Age Distribution by Attrition") +
   theme(plot.title = element_text(hjust = 0.5)) +
   geom_text(
     data    = dat_text,
@@ -141,7 +143,7 @@ attrition %>%
   ) +
   scale_fill_manual(values = c("#F781F3", "#819FF7")) 
 
-attrition$Attrition <- ifelse(attrition$Attrition == 1, 'Yes', 'No')
+
 
 attrition %>% 
   ggplot(aes(x = MonthlyIncome, fill = Attrition, color = Attrition)) +
@@ -190,7 +192,7 @@ attrition %>%
   group_by(Attrition, JobSatis) %>% 
   ggplot(aes(x = JobSatis, fill = Attrition, color = Attrition)) +
   geom_bar(alpha = 0.5) + 
-  labs(title = "Job satisfaction by Attrition" , y = 'Number of cases') + 
+  labs(title = "Job Satisfaction by Attrition" , y = 'Number of cases') + 
   theme_minimal() -> plot3
 
 attrition %>% 
@@ -200,7 +202,7 @@ attrition %>%
   ggplot(aes(x = JobSatis, y = number, fill = Attrition, color = Attrition)) +
   geom_bar(stat = "identity", position = "fill", alpha = 0.5) +
   scale_y_continuous(labels = scales::percent_format()) + 
-  labs(title = "Stacked Job satisfaction by Attrition" , y = 'Percentage') + 
+  labs(title = "Stacked Job Satisfaction by Attrition" , y = 'Percentage') + 
   theme_minimal() -> plot4
 
 grid.arrange(plot3, plot4)
@@ -216,6 +218,8 @@ attrition <- attrition %>%
          -StockOptionLevel, -YearsInCurrentRole, -YearsWithCurrManager, -Gender, -MonthlyIncome,
          -JobInvolvement, -NumCompaniesWorked, -TrainingTimesLastYear, -TotalWorkingYears, -JobSatis) # Same value for each row or some unnecesarry columns
 
+# Correlation matrix ----
+
 correl <- cor(attrition, method = "kendall")
 corrplot(correl)
 
@@ -226,18 +230,18 @@ sapply(attrition,
 summary(attrition)
 
 
-# Estimation of OLS model
+# Estimation of OLS model ----
 OLSmodel <- lm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried + Education + JobInvolvement +
                  JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked +
                  TotalWorkingYears + WorkLifeBalance + YearsAtCompany + YearsSinceLastPromotion +
                  Over7KM + Married + Female, data = attrition)
 summary(OLSmodel)
 
-# White's estimator of the variance-covariane matrix
+# White's estimator of the variance-covariane matrix ----
 robust_vcov = vcovHC(OLSmodel, data = attrition, type = "HC")
 OLSWhite <- coeftest(OLSmodel, vcov.=robust_vcov)
 
-# Estimation of probit model
+# Estimation of probit model ----
 probitModel1 <- glm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried + Education + JobInvolvement +
                       JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked  +
                       TotalWorkingYears + WorkLifeBalance + YearsAtCompany + YearsSinceLastPromotion +
@@ -262,7 +266,7 @@ stargazer(OLSWhite, probitModel1, logitModel1, type = 'text',
 AIC(probitModel1); AIC(logitModel1) 
 BIC(probitModel1); BIC(logitModel1) #logit rulez
 
-### general-to-specific
+# General-to-Specific ----
 
 # - Education
 logitModel2 <- glm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried  + JobInvolvement +
@@ -305,7 +309,7 @@ lmtest::lrtest(logitModel1, logitModel5) #0.21 p-value can not reject the null
 
 
 
-#diagnostic
+# Diagnostic tests ----
 
 linktest_result = linktest(logitModel5)
 gofresults = gof(logitModel5)
@@ -321,7 +325,7 @@ logitModel6 <- glm(Attrition ~ Age + Age2 +   JobInvolvement +
 summary(logitModel6)
 lmtest::lrtest(logitModel1, logitModel6) #0.21 p-value can not reject the null 
 
-#diagnostic
+# Diagnostic tests ----
 
 linktest_result = linktest(logitModel6)
 gofresults = gof(logitModel6)
@@ -329,7 +333,7 @@ gofresults$gof
 
 BaylorEdPsych::PseudoR2(logitModel6)
 
-# Marginal effects
+# Marginal effects ----
 options(scipen = 99)
 meff = probitmfx(formula=Attrition ~ Age + Age2 +   JobInvolvement + 
                    JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked +
@@ -338,7 +342,9 @@ meff = probitmfx(formula=Attrition ~ Age + Age2 +   JobInvolvement +
 meff
 mean(attrition$Age)
 
-(-0.0329+2*0.00039*36.9)*100
+(meff$mfxest[1]+2*meff$mfxest[2]*mean(attrition$Age))*100
 
 
-
+stargazer(logitModel1,logitModel2,logitModel3,logitModel4,logitModel5,logitModel6, type = 'text',
+          align = TRUE, style = "default", df = FALSE,
+          star.cutoffs = c(0.05, 0.01, 0.001))
