@@ -35,6 +35,7 @@ library("logistf") #Firth's bias reduction method
 library("stargazer")
 library("BaylorEdPsych")
 library("corrplot")
+library(gridExtra)
 
 
 # Loading external functions
@@ -58,6 +59,9 @@ attrition$OverTime <- ifelse(attrition$OverTime == 'Yes', 1, 0)
 attrition$lnMonthlyIncome <- log(attrition$MonthlyIncome)
 attrition$AgeOverTime <- attrition$Age * attrition$OverTime
 
+attrition %>% 
+  head()
+
 # attrition$BusinessTravel <- factor(attrition$BusinessTravel,
 #                            # levels from lowest to highest
 #                            levels = c("Non-Travel",
@@ -71,7 +75,137 @@ attrition %>%
   sort()
 
 
+# Data analysis
 
+
+attrition %>% 
+  group_by(Attrition) %>% 
+  summarise(Count = n()) %>%
+  ggplot(aes(x = Attrition, y = Count)) +
+  geom_bar(stat = "identity", fill = "deepskyblue", color = "grey40", alpha = 0.5) +
+  theme_bw() +
+  coord_flip() +
+  geom_text(
+    aes(
+      x = Attrition,
+      y = 0.01,
+      label = paste0(Count, ifelse(Attrition == 1, ' (Yes)', ' (No)'))
+    ),
+    hjust = -0.8,
+    vjust = -1,
+    size = 3,
+    colour = "black",
+    fontface = "bold",
+    angle = 360
+  ) +
+  labs(title = "Employee Attrition (Number of cases)", x = "Employee Attrition", y =
+         "Number of cases") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+options(repr.plot.width=8, repr.plot.height=6) 
+
+attrition %>%
+  select(Female, Age) %>%
+  filter(!is.na(Age)) %>%
+  group_by(Female) %>% 
+  summarise(mean = mean(Age))
+
+attrition$Female <- ifelse(attrition$Female == 1, 'Female', 'Male')
+
+dat_text <- data.frame(label = c("Mean = 37.3", "Mean = 36.7"),
+                       Female   = c('Female', 'Male'))
+
+
+attrition %>%
+  select(Female, Age) %>%
+  filter(!is.na(Age)) %>%
+  group_by(Female) %>%
+  ggplot(aes(x = Age)) +
+  geom_density(aes(fill = factor(Female)), alpha = 0.5, show.legend = FALSE) +
+  facet_wrap( ~ Female) +
+  theme_minimal() +
+  geom_vline(
+    aes(xintercept = mean(Age)),
+    color = "red",
+    linetype = "dashed",
+    size = 1
+  ) +
+  labs(title = "Age Distribution by Gender") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_text(
+    data    = dat_text,
+    mapping = aes(x = 45, y = 0.03, label = label),
+    hjust   = -0.1,
+    vjust   = -1
+  ) +
+  scale_fill_manual(values = c("#F781F3", "#819FF7")) 
+
+attrition$Attrition <- ifelse(attrition$Attrition == 1, 'Yes', 'No')
+
+attrition %>% 
+  ggplot(aes(x = MonthlyIncome, fill = Attrition, color = Attrition)) +
+  geom_histogram(position = 'identity', alpha = 0.5) + 
+  labs(title = "Monthly Income Distribiution by Attrition", y = 'Number of cases') + 
+  theme_minimal() 
+
+attrition %>% 
+  ggplot(aes(x = lnMonthlyIncome, fill = Attrition, color = Attrition)) +
+  geom_histogram(position = 'identity', alpha = 0.5) + 
+  labs(title = "Natural Logarithm of Monthly Income Distribiution by Attrition" , y = 'Number of cases') + 
+  theme_minimal()
+
+
+
+attrition %>% 
+  select(Attrition, YearsSinceLastPromotion) %>% 
+  group_by(Attrition, YearsSinceLastPromotion) %>% 
+  summarise(number = n()) %>% 
+  ggplot(aes(x = YearsSinceLastPromotion, y = number, fill = Attrition, color = Attrition)) +
+  geom_bar(stat = "identity", position = "fill", alpha = 0.5) +
+  scale_y_continuous(labels = scales::percent_format()) + 
+  labs(title = "Stacked Years since last promotion Distribution by Attrition" , y = 'Percentage') + 
+  theme_minimal() -> plot1
+
+attrition %>% 
+  select(Attrition, YearsSinceLastPromotion) %>% 
+  group_by(Attrition, YearsSinceLastPromotion) %>% 
+  ggplot(aes(x = YearsSinceLastPromotion, fill = Attrition, color = Attrition)) +
+  geom_bar(alpha = 0.5) + 
+  labs(title = "Years since last promotion Distribution by Attrition" , y = 'Number of cases') + 
+  theme_minimal() -> plot2
+
+grid.arrange(plot2, plot1)
+
+attrition$JobSatis <- 0
+attrition$JobSatis[attrition$JobSatisfaction == 1] <- 'Low' 
+attrition$JobSatis[attrition$JobSatisfaction == 2] <- 'Medium' 
+attrition$JobSatis[attrition$JobSatisfaction == 3] <- 'High' 
+attrition$JobSatis[attrition$JobSatisfaction == 4] <- 'Very High' 
+
+attrition$JobSatis <- factor(attrition$JobSatis, levels = c('Low', 'Medium', 'High', 'Very High'))
+
+attrition %>% 
+  select(Attrition, JobSatis) %>% 
+  group_by(Attrition, JobSatis) %>% 
+  ggplot(aes(x = JobSatis, fill = Attrition, color = Attrition)) +
+  geom_bar(alpha = 0.5) + 
+  labs(title = "Job satisfaction by Attrition" , y = 'Number of cases') + 
+  theme_minimal() -> plot3
+
+attrition %>% 
+  select(Attrition, JobSatis) %>% 
+  group_by(Attrition, JobSatis) %>% 
+  summarise(number = n()) %>% 
+  ggplot(aes(x = JobSatis, y = number, fill = Attrition, color = Attrition)) +
+  geom_bar(stat = "identity", position = "fill", alpha = 0.5) +
+  scale_y_continuous(labels = scales::percent_format()) + 
+  labs(title = "Stacked Job satisfaction by Attrition" , y = 'Percentage') + 
+  theme_minimal() -> plot4
+
+grid.arrange(plot3, plot4)
+
+attrition$Attrition <- ifelse(attrition$Attrition == 'Yes', 1, 0)
+attrition$Female <- ifelse(attrition$Female == 'Female', 1, 0)
 
 
 attrition <- attrition %>% 
@@ -79,7 +213,7 @@ attrition <- attrition %>%
          -DistanceFromHome, -EducationField, -HourlyRate, -JobLevel, -JobRole, -EnvironmentSatisfaction, 
          -MaritalStatus, -MonthlyRate, -PercentSalaryHike, -PerformanceRating, -RelationshipSatisfaction,
          -StockOptionLevel, -YearsInCurrentRole, -YearsWithCurrManager, -Gender, -MonthlyIncome,
-         -JobInvolvement, -NumCompaniesWorked, -TrainingTimesLastYear, -TotalWorkingYears) # Same value for each row or some unnecesarry columns
+         -JobInvolvement, -NumCompaniesWorked, -TrainingTimesLastYear, -TotalWorkingYears, -JobSatis) # Same value for each row or some unnecesarry columns
 
 correl <- cor(attrition, method = "kendall")
 corrplot(correl)
@@ -90,10 +224,6 @@ sapply(attrition,
 
 summary(attrition)
 
-attrition %>% 
-  select(MonthlyIncome) %>% 
-  log() %>% 
-  hist()
 
 # Estimation of OLS model
 OLSmodel <- lm(Attrition ~ ., data = attrition)
