@@ -207,16 +207,46 @@ attrition %>%
 
 grid.arrange(plot3, plot4)
 
+attrition$Educ <- 0
+attrition$Educ[attrition$Education == 1] <- 'Below College' 
+attrition$Educ[attrition$Education == 2] <- 'College' 
+attrition$Educ[attrition$Education == 3] <- 'Bachelor' 
+attrition$Educ[attrition$Education == 4] <- 'Master' 
+attrition$Educ[attrition$Education == 5] <- 'Doctor' 
+
+attrition$Educ <- factor(attrition$Educ, levels = c('Below College', 'College', 'Bachelor', 'Master', 'Doctor'))
+
+attrition %>% 
+  select(Attrition, Educ) %>% 
+  group_by(Attrition, Educ) %>% 
+  ggplot(aes(x = Educ, fill = Attrition, color = Attrition)) +
+  geom_bar(alpha = 0.5) + 
+  labs(title = "Education level by Attrition" , y = 'Number of cases') + 
+  theme_minimal() -> plot5
+
+attrition %>% 
+  select(Attrition, Educ) %>% 
+  group_by(Attrition, Educ) %>% 
+  summarise(number = n()) %>% 
+  ggplot(aes(x = Educ, y = number, fill = Attrition, color = Attrition)) +
+  geom_bar(stat = "identity", position = "fill", alpha = 0.5) +
+  scale_y_continuous(labels = scales::percent_format()) + 
+  labs(title = "Stacked Education level by Attrition" , y = 'Percentage') + 
+  theme_minimal() -> plot6
+
+grid.arrange(plot5, plot6)
+
+
 attrition$Attrition <- ifelse(attrition$Attrition == 'Yes', 1, 0)
 attrition$Female <- ifelse(attrition$Female == 'Female', 1, 0)
 
 
-attrition <- attrition %>% 
-  select(-EmployeeCount, -Over18, -StandardHours, -EmployeeNumber, -DailyRate, -Department, -BusinessTravel,
-         -DistanceFromHome, -EducationField, -HourlyRate, -JobLevel, -JobRole, -EnvironmentSatisfaction, 
-         -MaritalStatus, -MonthlyRate, -PercentSalaryHike, -PerformanceRating, -RelationshipSatisfaction,
-         -StockOptionLevel, -YearsInCurrentRole, -YearsWithCurrManager, -Gender, -MonthlyIncome,
-         -JobInvolvement, -NumCompaniesWorked, -TrainingTimesLastYear, -TotalWorkingYears, -JobSatis) # Same value for each row or some unnecesarry columns
+# attrition <- attrition %>% 
+#   select(-EmployeeCount, -Over18, -StandardHours, -EmployeeNumber, -DailyRate, -Department, -BusinessTravel,
+#          -DistanceFromHome, -EducationField, -HourlyRate, -JobLevel, -JobRole, -EnvironmentSatisfaction, 
+#          -MaritalStatus, -MonthlyRate, -PercentSalaryHike, -PerformanceRating, -RelationshipSatisfaction,
+#          -StockOptionLevel, -YearsInCurrentRole, -YearsWithCurrManager, -Gender, -MonthlyIncome,
+#          -JobInvolvement, -NumCompaniesWorked, -TrainingTimesLastYear, -TotalWorkingYears, -JobSatis) # Same value for each row or some unnecesarry columns
 
 # Correlation matrix ----
 
@@ -295,7 +325,7 @@ logitModel4 <- glm(Attrition ~ Age + Age2 + AgeOverTime +  JobInvolvement +
                    family=binomial(link="logit"))
 
 summary(logitModel4)
-lmtest::lrtest(logitModel1, logitModel4) #0.4094 p-value can not reject the null 
+lmtest::lrtest(logitModel1, logitModel4) #0.4413 p-value can not reject the null 
 
 # - Female
 logitModel5 <- glm(Attrition ~ Age + Age2 + AgeOverTime +  JobInvolvement + 
@@ -305,7 +335,7 @@ logitModel5 <- glm(Attrition ~ Age + Age2 + AgeOverTime +  JobInvolvement +
                    family=binomial(link="logit"))
 
 summary(logitModel5)
-lmtest::lrtest(logitModel1, logitModel5) #0.21 p-value can not reject the null 
+lmtest::lrtest(logitModel1, logitModel5) #0.2197 p-value can not reject the null 
 
 
 
@@ -323,7 +353,7 @@ logitModel6 <- glm(Attrition ~ Age + Age2 +   JobInvolvement +
                    family=binomial(link="logit"))
 
 summary(logitModel6)
-lmtest::lrtest(logitModel1, logitModel6) #0.21 p-value can not reject the null 
+lmtest::lrtest(logitModel1, logitModel6) #<2.2e-16 p-value reject the null 
 
 # Diagnostic tests ----
 
