@@ -21,6 +21,7 @@ if (!require(mfx)) install.packages('mfx')
 if (!require(tidyverse)) install.packages('tidyverse')
 if (!require(regclass)) install.packages('regclass')
 if (!require(corrplot)) install.packages('corrplot')
+if (!require(PerformanceAnalytics)) install.packages('PerformanceAnalytics')
 
 # Loading necessary libraries ----
 library("regclass")
@@ -36,6 +37,7 @@ library("stargazer")
 library("BaylorEdPsych")
 library("corrplot")
 library(gridExtra)
+library("PerformanceAnalytics")
 
 
 # Loading external functions ----
@@ -62,13 +64,6 @@ attrition$AgexMarried <- attrition$Age * attrition$Married
 
 attrition %>% 
   head()
-
-# attrition$BusinessTravel <- factor(attrition$BusinessTravel,
-#                            # levels from lowest to highest
-#                            levels = c("Non-Travel",
-#                                       "Travel_Rarely",
-#                                       "Travel_Frequently"),
-#                            ordered = TRUE) # ordinal
 
 # Check if in the dataset exist some missing values ----
 
@@ -240,14 +235,6 @@ grid.arrange(plot5, plot6)
 attrition$Attrition <- ifelse(attrition$Attrition == 'Yes', 1, 0)
 attrition$Female <- ifelse(attrition$Female == 'Female', 1, 0)
 
-
-# attrition <- attrition %>% 
-#   select(-EmployeeCount, -Over18, -StandardHours, -EmployeeNumber, -DailyRate, -Department, -BusinessTravel,
-#          -DistanceFromHome, -EducationField, -HourlyRate, -JobLevel, -JobRole, -EnvironmentSatisfaction, 
-#          -MaritalStatus, -MonthlyRate, -PercentSalaryHike, -PerformanceRating, -RelationshipSatisfaction,
-#          -StockOptionLevel, -YearsInCurrentRole, -YearsWithCurrManager, -Gender, -MonthlyIncome,
-#          -JobInvolvement, -NumCompaniesWorked, -TrainingTimesLastYear, -TotalWorkingYears, -JobSatis) # Same value for each row or some unnecesarry columns
-
 # Correlation matrix ----
 
 correl <- cor(attrition, method = "kendall")
@@ -258,6 +245,11 @@ sapply(attrition,
          unique(x))
 
 summary(attrition)
+
+colnames(attrition)
+corr_distri <- attrition[, c(2,1,6,17,19,29)]
+chart.Correlation(corr_distri, histogram=TRUE, pch=19, method = 'kendall', pairs( labels = colnames(corr_distri)))
+
 
 
 # Estimation of OLS model ----
@@ -279,7 +271,7 @@ probitModel1 <- glm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried + Educati
                     family=binomial(link="probit"))
 summary(probitModel1)
 
-####
+#### Estimation of logit model
 
 logitModel1 <- glm(Attrition ~ Age + Age2 + AgeOverTime + AgexMarried + Education + JobInvolvement +
                       JobSatisfaction + lnMonthlyIncome + NumCompaniesWorked  +
@@ -292,7 +284,7 @@ stargazer(OLSWhite, probitModel1, logitModel1, type = 'text',
           align = TRUE, style = "default", df = FALSE,
           star.cutoffs = c(0.05, 0.01, 0.001))
 
-####
+#### 
 AIC(probitModel1); AIC(logitModel1) 
 BIC(probitModel1); BIC(logitModel1) #logit rulez
 
@@ -378,3 +370,13 @@ mean(attrition$Age)
 stargazer(logitModel1,logitModel2,logitModel3,logitModel4,logitModel5,logitModel6, type = 'text',
           align = TRUE, style = "default", df = FALSE,
           star.cutoffs = c(0.05, 0.01, 0.001))
+
+
+###	Validation of hypotheses
+logitModel7 <- glm(Attrition ~ lnMonthlyIncome , data=attrition, 
+                   family=binomial(link="logit"))
+
+lmtest::lrtest(logitModel6, logitModel7)
+
+
+
